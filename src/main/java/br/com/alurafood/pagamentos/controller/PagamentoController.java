@@ -2,6 +2,8 @@ package br.com.alurafood.pagamentos.controller;
 
 import br.com.alurafood.pagamentos.dto.PagamentoDto;
 import br.com.alurafood.pagamentos.service.PagamentoService;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import jakarta.servlet.ServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.data.domain.Pageable;
@@ -30,10 +32,18 @@ public class PagamentoController {
         return ok(pagamentoService.findAll(pageable));
     }
 
+    @GetMapping("/porta")
+    public ResponseEntity<?> porta(ServletRequest request) {
+        return ok(request.getLocalPort());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<?> findById(@PathVariable @NotNull Long id) {
         return ok(pagamentoService.findById(id));
     }
+
+
+
     @PostMapping
     public ResponseEntity<?> save (@RequestBody @Valid PagamentoDto pagamentoDto, UriComponentsBuilder uriComponentsBuilder) {
         PagamentoDto pagamento = pagamentoService.criarPagamento(pagamentoDto);
@@ -50,5 +60,15 @@ public class PagamentoController {
     public ResponseEntity<?> deletePayment(@PathVariable @NotNull Long id) {
         pagamentoService.excluir(id);
         return ResponseEntity.noContent().build();
+    }
+    @CircuitBreaker(name = "atualizaPedido", fallbackMethod = "pagamentoAutorizadoComIntegracaoPendente")
+    @PatchMapping("/{id}/confirmar")
+    public void confirmarPagamento(@PathVariable @NotNull Long id){
+        pagamentoService.confirmarPagamento(id);
+    }
+
+
+    public void pagamentoAutorizadoComIntegracaoPendente(Long id, Exception e){
+        pagamentoService.alteraStatus(id);
     }
 }
