@@ -6,6 +6,8 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import jakarta.servlet.ServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
@@ -21,9 +23,11 @@ import static org.springframework.http.ResponseEntity.ok;
 @RestController
 @RequestMapping("/pagamentos")
 public class PagamentoController {
+    private final RabbitTemplate rabbitTemplate;
     private final PagamentoService pagamentoService;
 
-    public PagamentoController(PagamentoService pagamentoService) {
+    public PagamentoController(RabbitTemplate rabbitTemplate, PagamentoService pagamentoService) {
+        this.rabbitTemplate = rabbitTemplate;
         this.pagamentoService = pagamentoService;
     }
 
@@ -49,6 +53,8 @@ public class PagamentoController {
         PagamentoDto pagamento = pagamentoService.criarPagamento(pagamentoDto);
 
         URI endereco = uriComponentsBuilder.path("/pagamentos/{id}").buildAndExpand(pagamento.getId()).toUri();
+        Message message = new Message(("Criei um pagamento com o id " + pagamento.getId()).getBytes());
+        rabbitTemplate.send("pagamento.concluido",message);
         return created(endereco).body(pagamento);
     }
     @PutMapping("/{id}")
